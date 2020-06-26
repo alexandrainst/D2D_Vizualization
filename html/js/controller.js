@@ -1,7 +1,7 @@
 
 import * as Scene from "./app.js";
 
-function testDrones(number){
+/* function testDrones(number){
 	console.log("Starting "+number+" drones");
 	for(let x =0; x<number; x++){
 		let droneData = {
@@ -22,59 +22,48 @@ function updateDrone(number){
 	}
 }
 
-export { testDrones};
+export { testDrones}; */
 
 window.addEventListener("load", function(evt) {
-    var output = document.getElementById("output");
-    var input = document.getElementById("input");
     var ws;
-    var print = function(message) {
-        var d = document.createElement("div");
-        d.textContent = message;
-        output.appendChild(d);
-    };
 
     //document.getElementById("open").onclick = 
     connectWS();
+    /* var tmp = '{"ID":1,"Position":{"X":-0,"Y":-0,"Z":18}}';
+    Scene.updateDrone(JSON.parse(tmp));
+    var tmp = '{"ID":1,"Position":{"X":10,"Y":10,"Z":50}}';
+    Scene.updateDrone(JSON.parse(tmp));
+    var tmp = '{"ID":1,"Position":{"X":-20,"Y":-50,"Z":100}}';
+    Scene.updateDrone(JSON.parse(tmp));
+    var tmp = '{"ID":1,"Position":{"X":124,"Y":0,"Z":-200}}';
+    Scene.updateDrone(JSON.parse(tmp)); */
 
     function connectWS(evt) {
 		console.log("OPEN MG");
         if (ws) {
             return false;
         }
-        ws = new WebSocket("ws://localhost:8080/echo");
+        ws = new WebSocket("ws://localhost:8080/output");
         console.log(ws);
         ws.onopen = function(evt) {
-            print("OPEN");
+            console.log("OPEN");
         }
         ws.onclose = function(evt) {
-            print("CLOSE");
+            console.log("CLOSE");
             ws = null;
         }
         ws.onmessage = function(evt) {
             //print("RESPONSE: " + evt.data);
             console.log(evt.data)
             var drone = JSON.parse(evt.data);
-            console.log(drone)
+            
+            Scene.updateDrone(drone);
+
         }
         ws.onerror = function(evt) {
             print("ERROR: " + evt.data);
         }
         return false;
     };
-    document.getElementById("send").onclick = function(evt) {
-        if (!ws) {
-            return false;
-        }
-        print("SEND: " + input.value);
-        ws.send(input.value);
-        return false;
-    };
-    document.getElementById("close").onclick = function(evt) {
-        if (!ws) {
-            return false;
-        }
-        ws.close();
-        return false;
-    };
+    
 });

@@ -25,20 +25,73 @@ String.prototype.format = function () {
 	};
 
 var container, stats;
-var camera, scene, renderer;
+var camera, scene, renderer, droneGroup;
 var splineHelperObjects = [];
 var splinePointsLength = 4;
 var positions = [];
 var point = new THREE.Vector3();
 
-var drones = [];
+var drones = {};
+var visiblePaths = {};
 
 var geometry = new THREE.BoxBufferGeometry( 20, 20, 20 );
 var transformControl;
 
-var ARC_SEGMENTS = 200;
 
-var splines = {};
+
+var raycaster = new THREE.Raycaster();
+var intersects;
+
+var mouse = new THREE.Vector3();
+
+document.addEventListener('mousemove', onDocumentMouseMove, false);
+document.addEventListener('mousedown', onDocumentMouseDown, false);
+
+
+function onDocumentMouseMove(event) {
+	event.preventDefault();
+
+	/* mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+	mouse.y = -(event.clientY / window.innerHeight) * 2 + 1; */
+	mouse.x = (event.clientX / document.getElementById("container").offsetWidth) * 2 - 1;
+	mouse.y = -(event.clientY / document.getElementById("container").offsetHeight) * 2 + 1;
+	
+}
+function onDocumentMouseDown(event) {
+	event.preventDefault();
+  	console.info('mouseDown');
+
+	let ooi = getOOI(intersects);
+	if(ooi==null){
+		return;
+	}
+	
+	let id = ooi.object.agentId;
+	let clickedDrone = drones[id];
+	if(clickedDrone.pathVisible){
+		//remove path
+		clickedDrone.pathVisible = false;
+		let path = visiblePaths[id];
+		scene.remove(path);
+	}else{
+		//draw path
+		let material = clickedDrone.mesh.material;
+		let points = [];
+		for(let i in clickedDrone.path){
+			let point = new THREE.Vector3(clickedDrone.path[i].x,clickedDrone.path[i].y,clickedDrone.path[i].z);
+			points.push(point);
+		}
+		points.push(clickedDrone.mesh.position);
+		var geometry = new THREE.BufferGeometry().setFromPoints( points );
+		var line = new THREE.Line( geometry, material );
+		visiblePaths[id] = line;
+
+		scene.add( line );
+
+		clickedDrone.pathVisible=true;
+	}
+  
+}
 
 /*var params = {
 	uniform: true,
@@ -50,13 +103,22 @@ var splines = {};
 	exportSpline: exportSpline
 };*/
 
+function getOOI(intersects){
+	if(intersects.length>0){
+		for(let i=0; i<intersects.length; i++){
+			let obj = intersects[i];
+			if(obj.object.name=="OOI"){
+				//console.log(obj);
+				return obj	
+			}
+		}
+	}
+	return null;
+}
+
+
 init();
 animate();
-initDrones();
-
-function initDrones(){
-	//UnitController.testDrones(5);
-}
 
 
 function init() {
@@ -110,6 +172,10 @@ function init() {
 	stats = new Stats();
 	container.appendChild( stats.dom );
 
+	droneGroup = new THREE.Group();
+	scene.add(droneGroup);
+
+
 	/*var gui = new GUI();
 
 	gui.add( params, 'uniform' );
@@ -129,255 +195,8 @@ function init() {
 	var controls = new OrbitControls( camera, renderer.domElement );
 	controls.damping = 0.2;
 	controls.addEventListener( 'change', render );
-/*
-	controls.addEventListener( 'start', function () {
-		cancelHideTransform();
-	} );
-
-	controls.addEventListener( 'end', function () {
-		delayHideTransform();
-	} );*/
-
-	/*transformControl = new TransformControls( camera, renderer.domElement );
-	transformControl.addEventListener( 'change', render );
-	transformControl.addEventListener( 'dragging-changed', function ( event ) {
-		controls.enabled = ! event.value;
-	} );
-
-	scene.add( transformControl );
-
-	// Hiding transform situation is a little in a mess :()
-	transformControl.addEventListener( 'change', function () {
-		cancelHideTransform();
-	} );
-
-	transformControl.addEventListener( 'mouseDown', function () {
-		cancelHideTransform();
-	} );
-
-	transformControl.addEventListener( 'mouseUp', function () {
-		delayHideTransform();
-	} );
-
-	transformControl.addEventListener( 'objectChange', function () {
-		updateSplineOutline();
-	} );
-*/
-	/*var dragcontrols = new DragControls( splineHelperObjects, camera, renderer.domElement ); //
-	dragcontrols.enabled = false;
-	dragcontrols.addEventListener( 'hoveron', function ( event ) {
-		transformControl.attach( event.object );
-		cancelHideTransform();
-	} );
-
-	dragcontrols.addEventListener( 'hoveroff', function () {
-		delayHideTransform();
-	} );
-
-	var hiding;
-
-	function delayHideTransform() {
-
-		cancelHideTransform();
-		hideTransform();
-
-	}
-
-	function hideTransform() {
-
-		hiding = setTimeout( function () {
-
-			transformControl.detach( transformControl.object );
-
-		}, 2500 );
-
-	}
-
-	function cancelHideTransform() {
-
-		if ( hiding ) clearTimeout( hiding );
-
-	}
-*/
-	/*******
-	 * Curves
-	 *********/
-
-	/*for ( var i = 0; i < splinePointsLength; i ++ ) {
-
-		addSplineObject( positions[ i ] );
-
-	}
-
-	positions = [];
-
-	for ( var i = 0; i < splinePointsLength; i ++ ) {
-
-		positions.push( splineHelperObjects[ i ].position );
-
-	}
-
-	var geometry = new THREE.BufferGeometry();
-	geometry.setAttribute( 'position', new THREE.BufferAttribute( new Float32Array( ARC_SEGMENTS * 3 ), 3 ) );
-
-	var curve = new THREE.CatmullRomCurve3( positions );
-	curve.curveType = 'catmullrom';
-	curve.mesh = new THREE.Line( geometry.clone(), new THREE.LineBasicMaterial( {
-		color: 0xff0000,
-		opacity: 0.35
-	} ) );
-	curve.mesh.castShadow = true;
-	splines.uniform = curve;
-
-	curve = new THREE.CatmullRomCurve3( positions );
-	curve.curveType = 'centripetal';
-	curve.mesh = new THREE.Line( geometry.clone(), new THREE.LineBasicMaterial( {
-		color: 0x00ff00,
-		opacity: 0.35
-	} ) );
-	curve.mesh.castShadow = true;
-	splines.centripetal = curve;
-
-	curve = new THREE.CatmullRomCurve3( positions );
-	curve.curveType = 'chordal';
-	curve.mesh = new THREE.Line( geometry.clone(), new THREE.LineBasicMaterial( {
-		color: 0x0000ff,
-		opacity: 0.35
-	} ) );
-	curve.mesh.castShadow = true;
-	splines.chordal = curve;
-
-	for ( var k in splines ) {
-
-		var spline = splines[ k ];
-		scene.add( spline.mesh );
-
-	}
-
-	load( [ new THREE.Vector3( 289.76843686945404, 452.51481137238443, 56.10018915737797 ),
-		new THREE.Vector3( - 53.56300074753207, 171.49711742836848, - 14.495472686253045 ),
-		new THREE.Vector3( - 91.40118730204415, 176.4306956436485, - 6.958271935582161 ),
-		new THREE.Vector3( - 383.785318791128, 491.1365363371675, 47.869296953772746 ) ] );*/
-
+	
 }
-
-
-
-
-
-/*			function addSplineObject( position ) {
-
-	var material = new THREE.MeshLambertMaterial( { color: Math.random() * 0xffffff } );
-	var object = new THREE.Mesh( geometry, material );
-
-	if ( position ) {
-
-		object.position.copy( position );
-
-	} else {
-
-		object.position.x = Math.random() * 1000 - 500;
-		object.position.y = Math.random() * 600;
-		object.position.z = Math.random() * 800 - 400;
-
-	}
-
-	object.castShadow = true;
-	object.receiveShadow = true;
-	scene.add( object );
-	splineHelperObjects.push( object );
-	return object;
-
-}*/
-
-/*			function addPoint() {
-
-	splinePointsLength ++;
-
-	positions.push( addSplineObject().position );
-
-	updateSplineOutline();
-
-}*/
-
-/*		function removePoint() {
-
-	if ( splinePointsLength <= 4 ) {
-
-		return;
-
-	}
-	splinePointsLength --;
-	positions.pop();
-	scene.remove( splineHelperObjects.pop() );
-
-	updateSplineOutline();
-
-}*/
-
-/*		function updateSplineOutline() {
-
-	for ( var k in splines ) {
-
-		var spline = splines[ k ];
-
-		var splineMesh = spline.mesh;
-		var position = splineMesh.geometry.attributes.position;
-
-		for ( var i = 0; i < ARC_SEGMENTS; i ++ ) {
-
-			var t = i / ( ARC_SEGMENTS - 1 );
-			spline.getPoint( t, point );
-			position.setXYZ( i, point.x, point.y, point.z );
-
-		}
-
-		position.needsUpdate = true;
-
-	}
-
-}*/
-
-/*			function exportSpline() {
-
-	var strplace = [];
-
-	for ( var i = 0; i < splinePointsLength; i ++ ) {
-
-		var p = splineHelperObjects[ i ].position;
-		strplace.push( 'new THREE.Vector3({0}, {1}, {2})'.format( p.x, p.y, p.z ) );
-
-	}
-
-	console.log( strplace.join( ',\n' ) );
-	var code = '[' + ( strplace.join( ',\n\t' ) ) + ']';
-	prompt( 'copy and paste code', code );
-
-}
-
-function load( new_positions ) {
-
-	while ( new_positions.length > positions.length ) {
-
-		addPoint();
-
-	}
-
-	while ( new_positions.length < positions.length ) {
-
-		removePoint();
-
-	}
-
-	for ( var i = 0; i < positions.length; i ++ ) {
-
-		positions[ i ].copy( new_positions[ i ] );
-
-	}
-
-	updateSplineOutline();
-
-}*/
 
 function animate() {
 
@@ -387,33 +206,43 @@ function animate() {
 
 }
 
-function render() {
-	//console.log(renderer.info.render);
-	/*splines.uniform.mesh.visible = params.uniform;
-	splines.centripetal.mesh.visible = params.centripetal;
-	splines.chordal.mesh.visible = params.chordal;*/
-	renderer.render( scene, camera );
 
+function render() {
+
+	raycaster.setFromCamera(mouse, camera);
+	intersects = raycaster.intersectObjects(droneGroup.children, true);
+	let obj = getOOI(intersects);
+	//show info about any ooi:
+	let infoHolder = document.getElementById("info");
+	if(obj!==null){
+		let pos = obj.object.position;
+		let content = "Id: "+obj.object.agentId+"<br> Current Position: ("+pos.x+","+pos.y+","+pos.z+")";
+		infoHolder.innerHTML=content;
+		infoHolder.style.opacity = "1.0"; 
+	}else{
+		infoHolder.style.opacity = "0.0";
+	}
+	renderer.render( scene, camera );
 }
 
-function updateDrone(droneId, dx,dy,dz){
+function updateDrone(data){
 	
-	for(let pos in drones){
-		let drone = drones[pos];
-		if(drone.data.ID==droneId){
-			drone.mesh.position.x+=dx;
-			drone.mesh.position.y+=dy;
-			drone.mesh.position.z+=dz;
-		}
+	if(data.ID in drones){
+		let drone = drones[data.ID];
+		drone.path.push(JSON.parse(JSON.stringify(drone.mesh.position)));
+		drone.mesh.position.x = data.Position.X;
+		drone.mesh.position.y = data.Position.Y;
+		drone.mesh.position.z = data.Position.Z;
+	}else{
+		addDrone(data);
 	}
 }
 
 
 function addDrone(droneData){
 	console.log("drone added");
-	console.log(droneData);
-	var width = 4;
-
+	
+	var width = 40;
 
 	var droneId = droneData.ID;
 	// console.log(droneData);
@@ -425,13 +254,17 @@ function addDrone(droneData){
 	var mesh = new THREE.Mesh( geometry, material ) ;
 	material.opacity = 0.6;
 	
-	//mesh.position.x = mesh.position.x+(droneId*(width+10));
-	mesh.position.x = droneData.Position;
-	var drone = {"data":droneData,"mesh":mesh};
-	drones.push(drone);
 	
+	mesh.position.x = droneData.Position.X;
+	mesh.position.y = droneData.Position.Y;
+	mesh.position.z = droneData.Position.Z;
+	var drone = {"data":droneData,"mesh":mesh,"path":[],"pathVisible":false};
+	drones[droneId] = drone;
+	mesh.name = "OOI";
+	mesh.agentId = droneId
 
-	scene.add( mesh );
+	//scene.add( mesh );
+	droneGroup.add( mesh );
 }
 
-export {addDrone,updateDrone}
+export {updateDrone}

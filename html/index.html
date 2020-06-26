@@ -15,34 +15,18 @@
 				color: #08f;
 			}
 
-			#info{
-				width:100%;
-				height:200px;
-				background-color: red;
-				z-index: 5000;
-				
+			#info {
+				position: absolute;
+				top: 10px;
+				width: 100%;
+				text-align: center;
+				z-index: 100;
+				display:block;
 			}
 		</style>
 	</head>
 	<body>
-		<div id="info">
-			<table>
-				<tr><td valign="top" width="50%">
-				<p>Click "Open" to create a connection to the server, 
-				"Send" to send a message to the server and "Close" to close the connection. 
-				You can change the message and send multiple times.
-				<p>
-				<form>
-				<button id="open">Open</button>
-				<button id="close">Close</button>
-				<p><input id="input" type="text" value="Hello world!">
-				<button id="send">Send</button>
-				</form>
-				</td><td valign="top" width="50%">
-				<div id="output"></div>
-				</td></tr></table>
-
-		</div>
+		<div id="info"></div>
 		<div id="container"></div>
 		</div>
 		

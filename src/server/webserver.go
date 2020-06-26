@@ -1,9 +1,7 @@
 package main
 
 import (
-	"encoding/json"
 	"flag"
-	"html/template"
 	"log"
 	"net/http"
 
@@ -13,13 +11,15 @@ import (
 var addr = flag.String("addr", "localhost:8080", "http service address")
 
 var upgrader = websocket.Upgrader{} // use default options
+var agentsInfo chan []byte
 
-func echo(w http.ResponseWriter, r *http.Request) {
+func output(w http.ResponseWriter, r *http.Request) {
 	c, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		log.Print("upgrade:", err)
 		return
 	}
+	log.Println(agentsInfo)
 	defer c.Close()
 	for {
 		/* mt, message, err := c.ReadMessage()
@@ -27,32 +27,61 @@ func echo(w http.ResponseWriter, r *http.Request) {
 			log.Println("read:", err)
 			break
 		} */
-		update := <-updates
-		log.Println(update)
-		drone, err := json.Marshal(update)
-		err = c.WriteMessage(1, drone)
-		if err != nil {
-			log.Println("write:", err)
-			break
+		//log.Println("rdy")
+		select {
+		case agent := <-agentsInfo:
+			log.Println("updated received")
+			log.Println(agent)
+			//drone, err := json.Marshal(update)
+			err = c.WriteMessage(1, agent)
+			if err != nil {
+				log.Println("write:", err)
+				break
+			}
+		default:
+			//log.Println("no message from agents")
 		}
+
 	}
 }
 
-func home(w http.ResponseWriter, r *http.Request) {
-
-	t, err := template.ParseFiles("edit.html")
-	log.Println(t)
-	log.Println(err)
-	// title := "D2D Visualization"
-	//t.Execute(w, title)
-	//homeTemplate.Execute(w, "ws://"+r.Host+"/echo")
+func input(w http.ResponseWriter, r *http.Request) {
+	c, err := upgrader.Upgrade(w, r, nil)
+	if err != nil {
+		log.Print("upgrade:", err)
+		return
+	}
+	log.Println(agentsInfo)
+	defer c.Close()
+	for {
+		_, message, err := c.ReadMessage()
+		if err != nil {
+			log.Println("read:", err)
+			break
+		}
+		//log.Printf("recv: %s", message)
+		select {
+		case agentsInfo <- message:
+			log.Println("update received and forwarded")
+		default:
+			//log.Println("updated receieved and ignored")
+		}
+		//log.Println("on channel")
+		/* err = c.WriteMessage(mt, message)
+		if err != nil {
+			log.Println("write:", err)
+			break
+		} */
+	}
 }
 
-func startWebServer(updates chan Drone) {
+func startWebServer() {
 	flag.Parse()
 	log.SetFlags(0)
 	log.Println("Starting...")
-	http.HandleFunc("/echo", echo)
+	http.HandleFunc("/output", output)
+	http.HandleFunc("/input", input)
+	agentsInfo = make(chan []byte)
 
 	fs := http.FileServer(http.Dir("../../html"))
 	http.Handle("/", fs)
