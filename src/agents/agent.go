@@ -2,7 +2,6 @@ package main
 
 import (
 	"encoding/json"
-	"flag"
 	"log"
 	"math/rand"
 	"net/url"
@@ -24,7 +23,7 @@ type Drone struct {
 	Position location
 }
 
-func runAsDummy(updates chan Drone) {
+func runAsDummy(updates chan Drone) *Drone {
 	width := 2000
 	height := 2000
 
@@ -33,22 +32,25 @@ func runAsDummy(updates chan Drone) {
 	y := rand.Intn(height) - 1000
 	z := rand.Intn(50)
 	var agent Drone = Drone{id, location{x, y, z}}
+	go func() {
 
-	for true {
-		//fmt.Printf("id: %v position: %v\n", drone.id, drone.position)
-		key := rand.Intn(3)
-		switch key {
-		case 0:
-			agent.Position.X = agent.Position.X + 10
-		case 1:
-			agent.Position.Y = agent.Position.Y + 10
-		case 2:
-			agent.Position.Z = agent.Position.Z + 10
+		for true {
+			//fmt.Printf("id: %v position: %v\n", drone.id, drone.position)
+			key := rand.Intn(3)
+			switch key {
+			case 0:
+				agent.Position.X = agent.Position.X + 10
+			case 1:
+				agent.Position.Y = agent.Position.Y + 10
+			case 2:
+				agent.Position.Z = agent.Position.Z + 10
+			}
+
+			updates <- agent
+			time.Sleep(100 * time.Millisecond)
 		}
-
-		updates <- agent
-		time.Sleep(100 * time.Millisecond)
-	}
+	}()
+	return &agent
 }
 
 func connectToWsServer(addr *string) *websocket.Conn {
@@ -86,7 +88,7 @@ func sendToWsServer(updates chan Drone, interrupt chan os.Signal, c *websocket.C
 					if c != nil {
 						break
 					}
-					time.Sleep(500 * time.Millisecond)
+					time.Sleep(1 * time.Second)
 				}
 
 			}
@@ -106,13 +108,7 @@ func sendToWsServer(updates chan Drone, interrupt chan os.Signal, c *websocket.C
 
 }
 
-func main() {
-
-	isDummy := flag.Bool("isDummy", true, "To run the agent with dummy data - for testing")
-	debug := flag.Bool("debug", true, "Have the agent connect to a ws to visualize data")
-	addr := flag.String("addr", "localhost:8080", "http service address")
-
-	flag.Parse()
+func startDrone(isDummy *bool, debug *bool, addr *string) *Drone {
 
 	updates := make(chan Drone)
 	interrupt := make(chan os.Signal, 1)
@@ -121,8 +117,19 @@ func main() {
 		url := connectToWsServer(addr)
 		go sendToWsServer(updates, interrupt, url, addr)
 	}
-
+	var agent *Drone
 	if *isDummy {
-		runAsDummy(updates)
+		agent = runAsDummy(updates)
 	}
+	return agent
 }
+
+/* func main() {
+
+	isDummy := flag.Bool("isDummy", true, "To run the agent with dummy data - for testing")
+	debug := flag.Bool("debug", true, "Have the agent connect to a ws to visualize data")
+	addr := flag.String("addr", "localhost:8080", "http service address")
+
+	flag.Parse()
+	startDrone(isDummy, debug, addr)
+} */

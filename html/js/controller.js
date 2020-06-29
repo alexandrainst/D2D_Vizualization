@@ -53,15 +53,22 @@ window.addEventListener("load", function(evt) {
             ws = null;
         }
         ws.onmessage = function(evt) {
-            //print("RESPONSE: " + evt.data);
-            console.log(evt.data)
-            var drone = JSON.parse(evt.data);
+            console.log("RESPONSE: " + evt.data);
+            let drone = null;
+            try {
+                drone = JSON.parse(evt.data);
+            } catch (e) {
+                console.log(evt.data);
+            }
+            //var drone = JSON.parse(evt.data);
+            if(drone!=null){
+                Scene.updateDrone(drone);
+            }
             
-            Scene.updateDrone(drone);
 
         }
         ws.onerror = function(evt) {
-            print("ERROR: " + evt.data);
+            console.log("ERROR: " + evt.data);
         }
         return false;
     };

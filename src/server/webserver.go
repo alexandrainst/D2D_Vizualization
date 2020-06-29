@@ -20,29 +20,22 @@ func output(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	log.Println(agentsInfo)
-	defer c.Close()
-	for {
-		/* mt, message, err := c.ReadMessage()
-		if err != nil {
-			log.Println("read:", err)
-			break
-		} */
-		//log.Println("rdy")
-		select {
-		case agent := <-agentsInfo:
-			log.Println("updated received")
-			log.Println(agent)
-			//drone, err := json.Marshal(update)
-			err = c.WriteMessage(1, agent)
-			if err != nil {
-				log.Println("write:", err)
-				break
-			}
-		default:
-			//log.Println("no message from agents")
-		}
+	writeToClient(c, 1, []byte("From Server: connection established"))
 
-	}
+	go func() {
+		log.Println("sub started from website")
+		defer c.Close()
+		for {
+			select {
+			case agent := <-agentsInfo:
+				//drone, err := json.Marshal(update)
+				writeToClient(c, 1, agent)
+			default:
+				//log.Println("no message from agents")
+			}
+
+		}
+	}()
 }
 
 func input(w http.ResponseWriter, r *http.Request) {
@@ -52,37 +45,56 @@ func input(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	log.Println(agentsInfo)
-	defer c.Close()
-	for {
-		_, message, err := c.ReadMessage()
-		if err != nil {
-			log.Println("read:", err)
-			break
+
+	go func() {
+		log.Println("sub started from agent")
+		defer c.Close()
+		for {
+
+			//agentsInfo <- []byte("hej")
+			_, message, err := c.ReadMessage()
+			if err != nil {
+				log.Println("read:", err)
+				break
+			}
+			agentsInfo <- []byte(message)
+			/* log.Printf("recv: %s", message)
+			msg := "hi"
+			select {
+			case agentsInfo <- []byte(msg):
+				fmt.Println("sent message", msg)
+			default:
+				fmt.Println("no message sent")
+			} */
+			/* select {
+			//case agentsInfo <- []byte(message):
+			case agentsInfo <- []byte("message"):
+				log.Println("update received and forwarded")
+			default:
+				//log.Println("updated receieved and ignored")
+			} */
+			//log.Println("on channel")
 		}
-		//log.Printf("recv: %s", message)
-		select {
-		case agentsInfo <- message:
-			log.Println("update received and forwarded")
-		default:
-			//log.Println("updated receieved and ignored")
-		}
-		//log.Println("on channel")
-		/* err = c.WriteMessage(mt, message)
-		if err != nil {
-			log.Println("write:", err)
-			break
-		} */
+	}()
+}
+
+func writeToClient(c *websocket.Conn, messageType int, message []byte) bool {
+	err := c.WriteMessage(messageType, message)
+	if err != nil {
+		log.Println("write:", err)
+		return false
 	}
+	return true
 }
 
 func startWebServer() {
 	flag.Parse()
 	log.SetFlags(0)
 	log.Println("Starting...")
+	agentsInfo = make(chan []byte)
 	http.HandleFunc("/output", output)
 	http.HandleFunc("/input", input)
-	agentsInfo = make(chan []byte)
-
+	//go test()
 	fs := http.FileServer(http.Dir("../../html"))
 	http.Handle("/", fs)
 	log.Fatal(http.ListenAndServe(*addr, nil))
