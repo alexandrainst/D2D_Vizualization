@@ -1,0 +1,19 @@
+{
+    "type":["find","surveil","measure"],
+    "area":[
+        {"coord1":["x1","y1","z1"]},
+        {"coord2":["x2","y2","z2"]}
+    ],
+    "metaNeeded":[
+        {"movementAxis":[1,2,3]},
+        {"swarmSW":["Human Detection",null]},
+        {"onboardHW":["Camera","MQ2","WiFi",null]},
+        {"swarmHW":["GPU",null]},
+        {"dataCollection":"URI"}
+    ],
+    "goal":[
+        {"matchImage":"URItoImg"},
+        {"finishPath":"(coordinateList)"},
+        {"matchValue":"value"}
+    ]
+}

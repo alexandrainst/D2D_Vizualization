@@ -1,0 +1,19 @@
+{
+    "type":"surveil",
+    "swarmPath":[
+        {"coord1":["x1","y1","z1"]},
+        {"coord2":["x2","y2","z2"]},
+        {"coord3":["x3","y3","z3"]},
+        {"coord4":["x4","y4","z4"]}
+    ],
+    "subtask":["coord1","coord2"],
+    "goal":"finishPath",
+    "onbardHW":["camera"],
+    "metaReferences":{
+        "hd":[
+            {"need":"Human Detection"},
+            {"URI":"localhost:1223"}
+        ]
+    },
+    "dataCollection":"URI"
+}
