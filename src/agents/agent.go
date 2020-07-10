@@ -1,14 +1,10 @@
 package main
 
 import (
-	"encoding/json"
 	"log"
 	"math/rand"
-	"net/url"
 	"os"
 	"time"
-
-	"github.com/gorilla/websocket"
 )
 
 type location struct {
@@ -23,7 +19,11 @@ type Drone struct {
 	Position location
 }
 
-func runAsDummy(updates chan Drone) *Drone {
+var toWS chan Drone
+var fromController chan map[string]interface{}
+var interrupt chan os.Signal
+
+func runAsDummy() *Drone {
 	width := 2000
 	height := 2000
 
@@ -46,81 +46,55 @@ func runAsDummy(updates chan Drone) *Drone {
 				agent.Position.Z = agent.Position.Z + 10
 			}
 
-			updates <- agent
+			toWS <- agent
 			time.Sleep(100 * time.Millisecond)
 		}
 	}()
 	return &agent
 }
 
-func connectToWsServer(addr *string) *websocket.Conn {
-	u := url.URL{Scheme: "ws", Host: *addr, Path: "/input"}
-	log.Printf("connecting to %s", u.String())
-	c, _, err := websocket.DefaultDialer.Dial(u.String(), nil)
+func runAsActual() *Drone {
+	id := rand.Intn(667)
+	var agent Drone = Drone{id, location{0, 0, 0}}
 
-	if err == nil {
-		log.Println("connected")
-	}
-	return c
-}
-func sendToWsServer(updates chan Drone, interrupt chan os.Signal, c *websocket.Conn, addr *string) {
-
-	defer c.Close()
-
-	for {
-
-		select {
-		case update := <-updates:
-
-			drone, err := json.Marshal(update)
-			if err != nil {
-				log.Println("marshal:", err)
-				return
-			}
-
-			wsErr := c.WriteMessage(websocket.TextMessage, drone)
-			if wsErr != nil {
-				log.Println("write:", wsErr)
-				time.Sleep(500 * time.Millisecond)
-				for i := 0; i < 5; i++ {
-					log.Println("trying to reconnect")
-					c = connectToWsServer(addr)
-					if c != nil {
-						break
-					}
-					time.Sleep(1 * time.Second)
-				}
-
-			}
-
-		case <-interrupt:
-			log.Println("interrupt")
-
-			// Cleanly close the connection by sending a close message and then
-			// waiting (with timeout) for the server to close the connection.
-			err := c.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, ""))
-			if err != nil {
-				log.Println("write close:", err)
-				return
+	go func() {
+		mission := <-fromController
+		for true {
+			select {
+			case newMission := <-fromController:
+				log.Println("New mission recieved")
+				log.Println(newMission)
+			default:
+				//normal work
+				log.Println(mission)
 			}
 		}
-	}
+	}()
 
+	return &agent
 }
 
-func startDrone(isDummy *bool, debug *bool, addr *string) *Drone {
+func startDrone(isDummy *bool, debug *bool, serverAddr *string, controllerAddr *string) *Drone {
 
-	updates := make(chan Drone)
-	interrupt := make(chan os.Signal, 1)
+	toWS = make(chan Drone)
+	fromController = make(chan map[string]interface{})
+	interrupt = make(chan os.Signal, 1)
 	//signal.Notify(interrupt, os.Interrupt)
 	if *debug {
-		url := connectToWsServer(addr)
-		go sendToWsServer(updates, interrupt, url, addr)
+		wsConn := connectToWsServer(serverAddr, "input")
+		go sendToWsServer(wsConn, serverAddr)
 	}
 	var agent *Drone
+
 	if *isDummy {
-		agent = runAsDummy(updates)
+		log.Println("Start as dummy")
+		agent = runAsDummy()
+	} else {
+		log.Println("Start as actual")
+		agent = runAsActual()
 	}
+	controllerConn := connectToWsServer(controllerAddr, "agents")
+	go controllerComm(agent, controllerConn, controllerAddr)
 	return agent
 }
 

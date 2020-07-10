@@ -44,7 +44,6 @@ func input(w http.ResponseWriter, r *http.Request) {
 		log.Print("upgrade:", err)
 		return
 	}
-	log.Println(agentsInfo)
 
 	go func() {
 		log.Println("sub started from agent")

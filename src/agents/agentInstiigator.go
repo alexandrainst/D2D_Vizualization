@@ -11,7 +11,8 @@ func main() {
 	noOfAgents := flag.Int("number", 1, "The number of agents to be initiated")
 	isDummy := flag.Bool("isDummy", true, "To run the agent with dummy data - for testing")
 	debug := flag.Bool("debug", true, "Have the agent connect to a ws to visualize data")
-	addr := flag.String("addr", "localhost:8080", "http service address")
+	wsServerAddr := flag.String("wsAddr", "localhost:8080", "WS server for visualization")
+	controllerAddr := flag.String("controllerAddr", "localhost:8044", "WS controller server")
 
 	flag.Parse()
 	fmt.Println("Starting", *noOfAgents, "agents")
@@ -19,7 +20,7 @@ func main() {
 	agents := make([]*Drone, 0)
 
 	for i := 0; i < *noOfAgents; i++ {
-		agent := startDrone(isDummy, debug, addr)
+		agent := startDrone(isDummy, debug, wsServerAddr, controllerAddr)
 		agents = append(agents, agent)
 	}
 	for {
