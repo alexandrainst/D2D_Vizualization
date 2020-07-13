@@ -19,7 +19,7 @@ func output(w http.ResponseWriter, r *http.Request) {
 		log.Print("upgrade:", err)
 		return
 	}
-	log.Println(agentsInfo)
+
 	writeToClient(c, 1, []byte("From Server: connection established"))
 
 	go func() {

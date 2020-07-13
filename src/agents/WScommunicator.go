@@ -83,7 +83,10 @@ func connectToWsServer(addr *string, path string) *websocket.Conn {
 }
 
 func sendToWsServer(c *websocket.Conn, addr *string) {
-
+	if c == nil {
+		log.Println("Connection for ", *addr, " not set up correctly")
+		return
+	}
 	defer c.Close()
 
 	for {
@@ -96,7 +99,7 @@ func sendToWsServer(c *websocket.Conn, addr *string) {
 				log.Println("marshal:", err)
 				return
 			}
-
+			log.Println(c)
 			wsErr := c.WriteMessage(websocket.TextMessage, drone)
 			if wsErr != nil {
 				log.Println("write:", wsErr)
