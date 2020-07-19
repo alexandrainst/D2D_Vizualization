@@ -4,10 +4,41 @@ import (
 	"encoding/json"
 	"log"
 	"net/url"
+	"strconv"
 	"time"
 
 	"github.com/gorilla/websocket"
 )
+
+func startMission(unparsedOwnPath []interface{}, unparsedSwarmPath []interface{}) {
+
+	extraditePaths(unparsedOwnPath, unparsedSwarmPath)
+	log.Println("ownPath: ", ownPath)
+	log.Println("swarm ", swarmPath)
+
+}
+
+func extraditePaths(unparsedOwnPath []interface{}, unparsedSwarmPath []interface{}) {
+	for _, wp := range unparsedOwnPath {
+		tmp := make([]int, 0)
+		for _, val := range wp.([]interface{}) {
+			log.Println(val)
+			intVal, _ := strconv.Atoi(val.(string))
+			tmp = append(tmp, intVal)
+		}
+		ownPath = append(ownPath, tmp)
+	}
+
+	for _, wp := range unparsedSwarmPath {
+		tmp := make([]int, 0)
+		for _, val := range wp.([]interface{}) {
+			log.Println(val)
+			intVal, _ := strconv.Atoi(val.(string))
+			tmp = append(tmp, intVal)
+		}
+		swarmPath = append(swarmPath, tmp)
+	}
+}
 
 func controllerComm(agent *Drone, controllerConn *websocket.Conn, controllerAddr *string) {
 	defer controllerConn.Close()
@@ -31,7 +62,7 @@ func controllerComm(agent *Drone, controllerConn *websocket.Conn, controllerAddr
 			}
 
 		default:
-			_, message, err := controllerConn.ReadMessage()
+			_, rawMessage, err := controllerConn.ReadMessage()
 			if err != nil {
 				time.Sleep(500 * time.Millisecond)
 				for i := 0; i < 5; i++ {
@@ -44,7 +75,17 @@ func controllerComm(agent *Drone, controllerConn *websocket.Conn, controllerAddr
 					time.Sleep(1 * time.Second)
 				}
 			}
+			var message map[string]interface{}
+			json.Unmarshal([]byte(rawMessage), &message)
 			log.Println(message)
+
+			log.Println(message["type"])
+			if message["type"] == "mission" {
+				log.Println("starting mission")
+				fromController <- message
+				//startMission(message["path"].([]interface{}), message["swarmPath"].([]interface{}))
+			}
+
 		}
 	}
 }
@@ -99,7 +140,7 @@ func sendToWsServer(c *websocket.Conn, addr *string) {
 				log.Println("marshal:", err)
 				return
 			}
-			log.Println(c)
+
 			wsErr := c.WriteMessage(websocket.TextMessage, drone)
 			if wsErr != nil {
 				log.Println("write:", wsErr)
