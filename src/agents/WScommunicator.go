@@ -77,9 +77,7 @@ func controllerComm(agent *Drone, controllerConn *websocket.Conn, controllerAddr
 			}
 			var message map[string]interface{}
 			json.Unmarshal([]byte(rawMessage), &message)
-			log.Println(message)
 
-			log.Println(message["type"])
 			if message["type"] == "mission" {
 				log.Println("starting mission")
 				fromController <- message

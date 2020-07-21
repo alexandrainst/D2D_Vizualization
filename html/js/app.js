@@ -83,6 +83,7 @@ function onDocumentMouseDown(event) {
 		}
 		points.push(clickedDrone.mesh.position);
 		var geometry = new THREE.BufferGeometry().setFromPoints( points );
+		geometry.rotateX(- Math.PI / 2 );
 		var line = new THREE.Line( geometry, material );
 		visiblePaths[id] = line;
 
@@ -146,6 +147,7 @@ function init() {
 
 	var planeGeometry = new THREE.PlaneBufferGeometry( 2000, 2000 );
 	planeGeometry.rotateX( - Math.PI / 2 );
+	
 	var planeMaterial = new THREE.ShadowMaterial( { opacity: 0.2 } );
 
 	var plane = new THREE.Mesh( planeGeometry, planeMaterial );
@@ -173,6 +175,8 @@ function init() {
 	container.appendChild( stats.dom );
 
 	droneGroup = new THREE.Group();
+	//droneGroup.rotateY(90);
+	droneGroup.rotateX( -Math.PI / 2 );
 	scene.add(droneGroup);
 
 
