@@ -10,8 +10,13 @@ import (
 
 //Drone is a struct for handling data
 type Drone struct {
-	ID       int
-	Position Vector
+	ID                 int
+	URL                string
+	Position           Vector
+	Key                string
+	Battery            int
+	MovementDimensions int
+	Hardware           string
 }
 
 type agent struct {
@@ -33,7 +38,10 @@ func runAsDummy() *Drone {
 	x := rand.Intn(width) - 1000
 	y := rand.Intn(height) - 1000
 	z := rand.Intn(50)
-	var agent Drone = Drone{id, Vector{float64(x), float64(y), float64(z)}}
+	//var agent Drone = Drone{id, Vector{float64(x), float64(y), float64(z)}}
+	var url, position, key, battery, movement, hardware = GetMetadataForAgent()
+	position = Vector{float64(x), float64(y), float64(z)}
+	var agent Drone = Drone{id, url, position, key, battery, movement, hardware}
 	go func() {
 
 		for true {
@@ -58,7 +66,9 @@ func runAsDummy() *Drone {
 
 func runAsActual() *Drone {
 	id := rand.Intn(667)
-	var agent Drone = Drone{id, Vector{0, 0, 0}}
+	var url, position, key, battery, movement, hardware = GetMetadataForAgent()
+	//var agent Drone = Drone{id, Vector{0, 0, 0}}
+	var agent Drone = Drone{id, url, position, key, battery, movement, hardware}
 
 	go func() {
 		mission := <-fromController
