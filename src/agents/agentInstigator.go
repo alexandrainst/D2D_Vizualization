@@ -8,7 +8,7 @@ import (
 
 func main() {
 	//fmt.Println("Usage: go agentInstigator #NoOfDrones")
-	noOfAgents := flag.Int("number", 2, "The number of agents to be initiated")
+	noOfAgents := flag.Int("number", 1, "The number of agents to be initiated")
 	isDummy := flag.Bool("isDummy", true, "To run the agent with dummy data - for testing")
 	debug := flag.Bool("debug", true, "Have the agent connect to a ws to visualize data")
 	wsServerAddr := flag.String("wsAddr", "localhost:8080", "WS server for visualization")

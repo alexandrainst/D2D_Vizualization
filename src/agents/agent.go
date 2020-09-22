@@ -135,6 +135,36 @@ func runAsActual() *Drone {
 	return &agent
 }
 
+func startMission(unparsedOwnPath []interface{}, unparsedSwarmPath []interface{}) {
+
+	extraditePaths(unparsedOwnPath, unparsedSwarmPath)
+	log.Println("ownPath: ", ownPath)
+	log.Println("swarm ", swarmPath)
+
+}
+
+func extraditePaths(unparsedOwnPath []interface{}, unparsedSwarmPath []interface{}) {
+	for _, wp := range unparsedOwnPath {
+		tmp := make([]int, 0)
+		for _, val := range wp.([]interface{}) {
+			log.Println(val)
+			intVal, _ := strconv.Atoi(val.(string))
+			tmp = append(tmp, intVal)
+		}
+		ownPath = append(ownPath, tmp)
+	}
+
+	for _, wp := range unparsedSwarmPath {
+		tmp := make([]int, 0)
+		for _, val := range wp.([]interface{}) {
+			log.Println(val)
+			intVal, _ := strconv.Atoi(val.(string))
+			tmp = append(tmp, intVal)
+		}
+		swarmPath = append(swarmPath, tmp)
+	}
+}
+
 func findRelevantWaypoint(path []interface{}) Vector {
 	var wp Vector
 
