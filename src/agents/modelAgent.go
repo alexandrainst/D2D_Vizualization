@@ -2,6 +2,17 @@ package main
 
 import "math"
 
+//Drone is a struct for handling data
+type Drone struct {
+	ID                 int
+	URL                string
+	Position           Vector
+	Key                string
+	Battery            int
+	MovementDimensions int
+	Hardware           string
+}
+
 // Vector - struct holding X Y Z values of a 3D vector
 type Vector struct {
 	X, Y, Z float64

@@ -8,17 +8,6 @@ import (
 	"time"
 )
 
-//Drone is a struct for handling data
-type Drone struct {
-	ID                 int
-	URL                string
-	Position           Vector
-	Key                string
-	Battery            int
-	MovementDimensions int
-	Hardware           string
-}
-
 type agent struct {
 	blah chan Drone
 }

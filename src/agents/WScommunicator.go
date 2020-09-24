@@ -58,17 +58,12 @@ func controllerComm(agent *Drone, controllerConn *websocket.Conn, controllerAddr
 }
 
 func registerAtController(agent *Drone, controllerConn *websocket.Conn) {
-	drone, err := json.Marshal(&agent)
-	if err != nil {
-		log.Println("marshal:", err)
-		return
-	}
-	log.Println(string(drone))
-	payload := map[string]interface{}{
-		"type":  "register",
-		"agent": &agent,
-	}
 
+	payload := map[string]interface{}{
+		"msgType": "register",
+		"agent":   &agent,
+	}
+	//payload := &agent
 	jsonPayload, _ := json.Marshal(payload)
 
 	wsErr := controllerConn.WriteMessage(websocket.TextMessage, jsonPayload)
