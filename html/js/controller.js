@@ -1,42 +1,15 @@
 
 import * as Scene from "./app.js";
 
-/* function testDrones(number){
-	console.log("Starting "+number+" drones");
-	for(let x =0; x<number; x++){
-		let droneData = {
-			"id":x
-		};
-		Scene.addDrone(droneData);
-	}
-
-	setInterval(function(){ updateDrone(number); },100);
-}
-
-function updateDrone(number){
-	for(let i =0; i<number; i++){
-		let x =  Math.round(Math.random());
-		let y = Math.round(Math.random());
-		let z = Math.round(Math.random());
-		Scene.updateDrone(i,x,y,z);
-	}
-}
-
-export { testDrones}; */
+const DiscoveryMessageType      = 0
+const StateMessageType          = 1
+const MissionMessageType        = 2
+const ReorganizationMessageType = 3
+const RecalculatorMessageType   = 4
 
 window.addEventListener("load", function(evt) {
     var ws;
-
-    //document.getElementById("open").onclick = 
     connectWS();
-    /* var tmp = '{"ID":1,"Position":{"X":-0,"Y":-0,"Z":18}}';
-    Scene.updateDrone(JSON.parse(tmp));
-    var tmp = '{"ID":1,"Position":{"X":10,"Y":10,"Z":50}}';
-    Scene.updateDrone(JSON.parse(tmp));
-    var tmp = '{"ID":1,"Position":{"X":-20,"Y":-50,"Z":100}}';
-    Scene.updateDrone(JSON.parse(tmp));
-    var tmp = '{"ID":1,"Position":{"X":124,"Y":0,"Z":-200}}';
-    Scene.updateDrone(JSON.parse(tmp)); */
 
     function connectWS(evt) {
 		console.log("OPEN MG");
@@ -51,19 +24,66 @@ window.addEventListener("load", function(evt) {
         ws.onclose = function(evt) {
             console.log("CLOSE");
             ws = null;
+            setTimeout(connectWS, 2000)
         }
         ws.onmessage = function(evt) {
-            console.log("RESPONSE: " + evt.data);
-            let drone = null;
+            //console.log("RESPONSE: " + evt.data);
+            let msg = null;
             try {
-                drone = JSON.parse(evt.data);
+                msg = JSON.parse(evt.data);
             } catch (e) {
                 console.log(evt.data);
+                return;
             }
             //var drone = JSON.parse(evt.data);
-            if(drone!=null){
-                Scene.updateDrone(drone);
+            //console.log(msg);
+            let drone = {}
+            drone.id = msg.SenderId;
+            drone.type = msg.SenderType;
+            
+            switch (msg.ContentType){
+                case DiscoveryMessageType:
+                    console.log("discovery mesg")
+                    break;
+                case StateMessageType:
+
+                    if(msg.MissionBound!=null){
+                        let max = msg.MissionBound["Max"];
+                        let min = msg.MissionBound["Min"];
+                        let normal = max[0]+max[1]+min[0]+min[1];
+                        if(normal>0){
+                            Scene.startScene(msg.MissionBound);
+                            
+                            Scene.addMissionPath(msg.StateMessage.Mission.SwarmGeometry[0],0xff0000,20, drone.id);
+                            
+                        }
+                    }
+
+                    //console.log(msg);
+                    drone.mission = msg.StateMessage.Mission.Geometry;
+                    drone.senderType = msg.SenderType;
+                    drone.batteryLevel = msg.StateMessage.Battery;
+                    let pos = {};
+                    pos.x = msg.StateMessage.Position.X;
+                    pos.y = msg.StateMessage.Position.Y;
+                    pos.z = msg.StateMessage.Position.Z;
+                    
+                    
+                    drone.position = pos;
+                    
+                    break;
+                case MissionMessageType:
+                    console.log("mission mesg")
+                    break;
+                case ReorganizationMessageType:
+                    console.log("reorg mesg")
+                    break;
+                case RecalculatorMessageType:
+                    console.log("recalc mesg")
+                    break;
             }
+        
+            Scene.updateAgent(drone);
             
 
         }
