@@ -7,6 +7,7 @@ const MissionMessageType        = 2
 const ReorganizationMessageType = 3
 const RecalculatorMessageType   = 4
 
+
 window.addEventListener("load", function(evt) {
     var ws;
     connectWS();
@@ -26,6 +27,7 @@ window.addEventListener("load", function(evt) {
             ws = null;
             setTimeout(connectWS, 2000)
         }
+        var ctrlId = null;
         ws.onmessage = function(evt) {
             //console.log("RESPONSE: " + evt.data);
             let msg = null;
@@ -36,15 +38,20 @@ window.addEventListener("load", function(evt) {
                 return;
             }
             //var drone = JSON.parse(evt.data);
-            //console.log(msg);
             let drone = {}
             drone.id = msg.SenderId;
             drone.type = msg.SenderType;
-            
+            var id; 
             switch (msg.ContentType){
+                
                 case DiscoveryMessageType:
-                    console.log("discovery mesg")
-                    break;
+                    id = msg.SenderId;
+                    if(msg.SenderId == ctrlId){
+                        id = "controller";
+                        Scene.markMissionaire(id);
+                    }
+
+                    return;
                 case StateMessageType:
 
                     if(msg.MissionBound!=null){
@@ -54,8 +61,8 @@ window.addEventListener("load", function(evt) {
                         if(normal>0){
                             Scene.startScene(msg.MissionBound);
                             
-                            Scene.addMissionPath(msg.StateMessage.Mission.SwarmGeometry[0],0xff0000,20, drone.id);
-                            
+                            Scene.addMissionPath(msg.StateMessage.Mission.SwarmGeometry[0],0xff0000,20, "controller");
+                            ctrlId = drone.id;
                         }
                     }
 
@@ -73,14 +80,39 @@ window.addEventListener("load", function(evt) {
                     
                     break;
                 case MissionMessageType:
-                    console.log("mission mesg")
+                    //console.log("mission mesg")
+                    //console.log(msg)
+                    Scene.newMission(msg)
+                    
+                    return;
                     break;
                 case ReorganizationMessageType:
-                    console.log("reorg mesg")
-                    break;
+                    let from = msg.SenderId;
+                    if(msg.SenderId == ctrlId){
+                        from = "controller";
+                    }
+                    let to = msg.DiscoveryMessage.UUID;
+                    if(msg.DiscoveryMessage.UUID==ctrlId){
+                        to = "controller"
+                    }
+                    let notice = {
+                        from:from,
+                        to:to
+                    }
+                    console.log(notice);
+                    Scene.reorganize(notice);
+                    return;
+                    
                 case RecalculatorMessageType:
                     console.log("recalc mesg")
-                    break;
+                    console.log(msg);
+                    id = msg.DiscoveryMessage.UUID;
+                    if(msg.DiscoveryMessage.UUID==ctrlId){
+                        id = "controller"
+                    }
+                    Scene.markMissionaire(id);
+                    return;
+                    //break;
             }
         
             Scene.updateAgent(drone);

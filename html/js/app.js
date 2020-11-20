@@ -25,7 +25,7 @@ String.prototype.format = function () {
 	};
 
 var  stats;
-var camera, scene, renderer, droneGroup;
+var camera, scene, renderer, droneGroup, pathGroup, traveledGroup, reorgGroup;
 // var splineHelperObjects = [];
 // var splinePointsLength = 4;
 // var positions = [];
@@ -134,7 +134,8 @@ function addMissionPath(swarmGeo, color, height,id){
 	line.name = id;
 	missionPaths[id]={"path":line,"points":points,"length":length};
 	
-	scene.add(line);
+	//scene.add(line);
+	pathGroup.add(line);
 }
 
 
@@ -199,7 +200,7 @@ function init() {
 
 	scene.add( new THREE.AmbientLight( 0xf0f0f0 ) );
 	var light = new THREE.SpotLight( 0xffffff, 1.5 );
-	light.position.set( 0, 1500, 200 );
+	light.position.set( 100, 1500, 200 );
 	light.angle = Math.PI * 0.2;
 	light.castShadow = true;
 	light.shadow.camera.near = 200;
@@ -233,7 +234,7 @@ function init() {
 	renderer = new THREE.WebGLRenderer( { antialias: true } );
 	renderer.setPixelRatio( window.devicePixelRatio );
 	//renderer.setSize( window.innerWidth, window.innerHeight );
-	console.log(container.innerWidth);
+	
 	renderer.setSize( container.clientWidth, container.clientHeight );
 	renderer.shadowMap.enabled = true;
 	container.appendChild( renderer.domElement );
@@ -242,9 +243,15 @@ function init() {
 	container.appendChild( stats.dom );
 
 	droneGroup = new THREE.Group();
+	pathGroup = new THREE.Group();
+	traveledGroup = new THREE.Group();
+	reorgGroup = new THREE.Group();
 	//droneGroup.rotateY(90);
 	//droneGroup.rotateX( -Math.PI / 2 );
 	scene.add(droneGroup);
+	scene.add(pathGroup);
+	scene.add(traveledGroup);
+	scene.add(reorgGroup);
 
 
 	/*var gui = new GUI();
@@ -297,6 +304,17 @@ function render() {
 	}else{
 		infoHolder.style.opacity = "0.0";
 	}
+	
+
+	for(let k in reorgGroup.children){
+		let line = reorgGroup.children[k];
+		line.geometry.verticesNeedUpdate = true;
+		line.material.opacity -=0.002;
+		if(line.material.opacity<=0){
+			reorgGroup.remove(line);
+		}
+	}
+
 	renderer.render( scene, camera );
 }
 
@@ -323,21 +341,18 @@ function updateAgent(data){
 	}
 
 	
-	if(data.id in drones){
+	
 		
-		if(data.senderType == ContextAgent){
+	if(data.senderType == ContextAgent){
+		if(data.id in drones){
 			updateDrone(data);
 		}else{
-			updateController(data);
+			addDrone(data);
 		}
-
 	}else{
-		if(data.senderType == ContextAgent){
-			let color = "green";
-			if(data.id == "Agent1"){
-				color = "red";
-			}
-			addDrone(data,color);
+		data.id="controller";
+		if(data.id in drones){
+			updateController(data);
 		}else{
 			addController(data);
 		}
@@ -350,13 +365,19 @@ function updateDrone(data){
 	
 	
 	drone.data = data;
-	drone.mesh.position.x = data.vizPos.x;
-	drone.mesh.position.y = data.vizPos.y;
-	drone.mesh.position.z = data.vizPos.z;
 	//let point = new THREE.Vector3(drone.mesh.position.x,drone.mesh.position.y,drone.mesh.position.z);
-	let point = new THREE.Vector3(drone.mesh.position.x,drone.mesh.position.y,drone.mesh.position.z);
+	let point = new THREE.Vector3(data.vizPos.x,data.vizPos.y,data.vizPos.z);
 	//drone.path.push(JSON.parse(JSON.stringify(drone.mesh.position)));
 	drone.path.push(point);
+	if(drone.moving){
+		drone.mesh.position.x = data.vizPos.x;
+		drone.mesh.position.y = data.vizPos.y;
+		drone.mesh.position.z = data.vizPos.z;
+	}else{
+		drone.moving=true;
+		drone.mesh.material.color = drone.color;
+	}
+	drone.mesh.scale.set(1,1,1);
 	
 	let key = "travel-"+drone.data.id;
 	removedTraveled(key);
@@ -368,7 +389,7 @@ function updateDrone(data){
 		var line = new THREE.Line( geometry, material );
 		line.name = key;
 
-		scene.add( line );
+		traveledGroup.add( line );
 	}
 
 	if(data.mission!=null && missionPaths[data.id]!=undefined){
@@ -381,12 +402,11 @@ function updateDrone(data){
 			
 		});
 		if(currPathLen!=newLen){
-			console.log("new mission!")
+			//console.log("new mission!")
 			//the agent's mission has been updated. We need to update the path as well
-			scene.remove(missionPaths[data.id].path);
+			pathGroup.remove(missionPaths[data.id].path);
 			delete missionPaths[data.id];
 			addMissionPath(data.mission[0], drone.pathColor,pathHeight, data.id)
-			console.log(missionPaths);
 
 		}
 	}
@@ -396,7 +416,13 @@ function updateDrone(data){
 }
 
 function updateController(data){
-
+	markMissionaire(data.id);
+	let ctrl = drones[data.id];
+	if(!ctrl.moving){
+		ctrl.moving=true;
+		ctrl.mesh.material.color = ctrl.color;
+		ctrl.mesh.scale.set(1,1,1);
+	}
 }
 
 
@@ -406,14 +432,17 @@ function addDrone(droneData,pathColor){
 	var width = 40;
 
 	var droneId = droneData.id;
-	// console.log(droneData);
+	
 	var hColor = Math.floor(Math.random() * 361);
 	var color = new THREE.Color("hsl("+hColor+", 100%, 50%)");
-	
+	if(pathColor==undefined){
+		pathColor=color;
+	}
 	var geometry = new THREE.TetrahedronGeometry(width);
 	var material = new THREE.MeshLambertMaterial({ color:color, transparent: true });
 	var mesh = new THREE.Mesh( geometry, material ) ;
 	material.opacity = 0.6;
+	mesh.scale.set(3,3,3);
 	
 	let h = -5;
 	
@@ -424,7 +453,7 @@ function addDrone(droneData,pathColor){
 	mesh.position.x = droneData.vizPos.x;
 	mesh.position.y = droneData.vizPos.y;
 	mesh.position.z = droneData.vizPos.z;
-	var drone = {"data":droneData,"mesh":mesh,"path":[],"pathVisible":false, "color":color, "pathColor":pathColor};
+	var drone = {"data":droneData,"mesh":mesh,"path":[],"pathVisible":false, "color":color.clone(), "pathColor":pathColor,"moving":true};
 	drones[droneId] = drone;
 	mesh.name = "OOI";
 	mesh.agentId = droneId
@@ -444,6 +473,7 @@ function addController(data){
 	const geometry = new THREE.BoxGeometry( 40, 40, 200 );
 	
 	var material = new THREE.MeshLambertMaterial({ color:color, transparent: true });
+	
 	const rect = new THREE.Mesh( geometry, material );
 	
 	rect.position.x = data.vizPos.x;
@@ -454,14 +484,67 @@ function addController(data){
 	rect.name = "OOI";
 
 	console.log("add controller");
-	var ctrl = {"data":data,"mesh":rect,"path":[],"pathVisible":false, "color":color};
+	// console.log(data);
+	// console.log(drones);
+	var ctrl = {"data":data,"mesh":rect,"path":[],"pathVisible":false, "color":color.clone()};
 	drones[data.id] = ctrl;
 	rect.agentId = data.id;
 
 
 	//rect.rotateX( -Math.PI / 2 );
 	let s = droneGroup.add(rect);
+	console.log(rect);
+	console.log(typeof rect.geometry)
 	addUIElement(ctrl,true);
+	
+}
+
+
+function newMission(msg){
+	for(let i in missionPaths){
+		if(i!="controller"){
+			pathGroup.remove(missionPaths[i].path);
+		}
+		
+	}
+	addMissionPath(msg.MissionMessage.Geometry[0],0xff0000,20, msg.SenderId);
+}
+
+function reorganize(notice){
+	let goneDrone = drones[notice.to];
+	goneDrone.moving=false;
+	goneDrone.mesh.scale.set(0.75,0.75,0.75);
+	goneDrone.mesh.material.color.setHex(0x808080);
+	//draw lines from observer
+	let fromLocation = drones[notice.from].mesh.position;
+	let toLocation = goneDrone.mesh.position;
+	//et points = [fromLocation,toLocation];
+	var lineGeom = new THREE.Geometry();
+  	lineGeom.vertices.push(fromLocation);
+  	lineGeom.vertices.push(toLocation);
+	const material = new THREE.LineBasicMaterial( { color: 0xffff00 } );
+	material.transparent = true;
+
+	//const geometry = new THREE.BufferGeometry().setFromPoints( points );
+
+
+	const line = new THREE.Line( lineGeom, material );
+	reorgGroup.add(line);
+}
+
+function markMissionaire(id){
+	for(let i in drones){
+		let d = drones[i];
+		
+		if(i!="controller"){
+			d.mesh.material.color.set(d.color);
+		}
+		
+	}
+	if(id!="controller"){
+		let newC = drones[id];
+		newC.mesh.material.color.setHex(0x000000);
+	}
 	
 }
 
@@ -489,12 +572,12 @@ function addUIElement(agent,isCtrl){
 	if(isCtrl) {
 		ui.querySelector(".missionArea").style.display = "inherit";
 		ui.querySelector("#missionAreaBtn").addEventListener('mousedown', function(evt){
-			let line = missionPaths[agent.data.id].path;
-			if(scene.getObjectByName(agent.data.id) != undefined){
+			let line = missionPaths["controller"].path;
+			if(scene.getObjectByName("controller") != undefined){
 				//line visible
-				scene.remove(line);
+				pathGroup.remove(line);
 			}else{
-				scene.add(line);
+				pathGroup.add(line);
 			}
 		}, false);
 	}
@@ -502,21 +585,60 @@ function addUIElement(agent,isCtrl){
 
 	ui.querySelector("#missionPathBtn").addEventListener('mousedown', function(evt){
 		if(isCtrl){
+			let show=false;
+			let showBoundary=false;
+			if(scene.getObjectByName("controller") != undefined){
+				showBoundary=true;
+			}
+			
+			for(let i in drones){
+				if(scene.getObjectByName(i) == undefined){
+					show=true;
+				}
+			}
+			pathGroup.children = [];
+			if(show){
+				for(let i in missionPaths){
+					pathGroup.add(missionPaths[i].path);
+				}
+			}
+			if(showBoundary){
+				if(scene.getObjectByName("controller") == undefined){
+					pathGroup.add(missionPaths['controller'].path);
+				}
+			}
+
 			
 		}else{
 			let line = missionPaths[agent.data.id].path;
-			if(scene.getObjectByName(agent.data.id) != undefined){
-				//line visible
-				scene.remove(line);
-			}else{
-				scene.add(line);
+			let pathShown = false;
+			for(let k in pathGroup.children){
+				let child = pathGroup.children[k];
+				if(child.name==agent.data.id){
+					pathGroup.remove(line);
+					pathShown=true;
+				}
+			}
+			if(!pathShown){
+				pathGroup.add(line);
 			}
 		}
 	}, false);
 
 	ui.querySelector("#traveledPathBtn").addEventListener('mousedown', function(evt){
 		if(isCtrl){
-			
+			let showPath = true;
+			for(let i in drones){
+				let drone = drones[i];
+				if(drone.pathVisible){
+					showPath=false;
+					break;
+				}
+			}
+			for(let i in drones){
+				let drone = drones[i];
+				drone.pathVisible=showPath;
+			}
 		}else{
 			console.log("toggle");
 			agent.pathVisible= !agent.pathVisible;
@@ -539,7 +661,7 @@ function updateUIFields(agent){
 function removedTraveled(key){
 	let l = scene.getObjectByName(key)
 	if(l != undefined){
-		scene.remove(l);
+		traveledGroup.remove(l);
 	}
 }
 
@@ -563,7 +685,10 @@ function getOOI(intersects){
 function onDocumentKeyUp(event){
 	if(event.key=="r"){
 		console.log("reset cam");
-		controls.reset();
+		if(controls!=undefined){
+			controls.reset();
+		}
+		
 	}
 }
 
@@ -597,4 +722,4 @@ function onDocumentMouseDown(event) {
 	}
 }
 
-export {updateAgent, startScene, addMissionPath}
+export {updateAgent, startScene, addMissionPath, newMission, reorganize, markMissionaire}
