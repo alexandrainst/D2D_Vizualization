@@ -28,7 +28,7 @@ type MqttSettings struct {
 
 var mqttAddr = flag.String("mqttAddr", "localhost:1883", "mosquitto broker address")
 var client mqtt.Client
-var knownAgents = make(map[string]struct{})
+var knownAgents = make(map[string]bool)
 var conf MqttSettings
 
 func StartMQTT() {
@@ -90,12 +90,36 @@ func sendMessages() {
 		for {
 			select {
 			case vsMessage := <-AgentsInfo:
+				subIfMissing(vsMessage.SenderId)
 				agent, err := json.Marshal(vsMessage)
+
 				if err != nil {
 					log.Println("ERRR WS!")
 					log.Println(err)
 				}
-				topic := conf.MessageTopicPrefix + vsMessage.SenderId + "/"
+				suffix := ""
+				switch vsMessage.ContentType {
+				case comm.DiscoveryMessageType:
+					suffix = "discovery"
+					break
+				case comm.StateMessageType:
+					suffix = "state"
+					break
+				case comm.MissionMessageType:
+					suffix = "mission"
+					break
+				case comm.ReorganizationMessageType:
+					suffix = "reorganization"
+					break
+				case comm.RecalculatorMessageType:
+					suffix = "recalculation"
+					break
+				case comm.GoalMessageType:
+					suffix = "goal"
+					break
+				}
+				suffix += "/"
+				topic := conf.MessageTopicPrefix + vsMessage.SenderId + suffix
 				token := client.Publish(topic, 0, false, agent)
 				token.Wait()
 				//drone, err := json.Marshal(update)
@@ -111,13 +135,14 @@ func sendMessages() {
 
 func subIfMissing(id string) {
 	if _, ok := knownAgents[id]; !ok {
+		knownAgents[id] = true
 		log.Println("Received message from new agent. Subscribing to correct topic")
-		topic := conf.GoalTopicPrefix + id + "/"
+		topic := conf.GoalTopicPrefix + id + "/goal/"
 		log.Println("subscribing to: " + topic)
 		token := client.Subscribe(topic, 1, nil)
 		token.Wait()
 	} else {
-		log.Println("Agent already known")
+		//log.Println("Agent already known")
 	}
 }
 
