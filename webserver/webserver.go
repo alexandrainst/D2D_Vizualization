@@ -7,6 +7,7 @@ import (
 	"net/http"
 
 	comm "github.com/alexandrainst/D2D-communication"
+	"github.com/alexandrainst/agentlogic"
 
 	"github.com/gorilla/websocket"
 )
@@ -15,6 +16,7 @@ var addr = flag.String("addr", "localhost:8080", "http service address")
 
 var upgrader = websocket.Upgrader{} // use default options
 var AgentsInfo = make(chan comm.VisualizationMessage, 128)
+var GoalInfo = make(chan comm.GoalMessage, 128)
 
 func output(w http.ResponseWriter, r *http.Request) {
 	c, err := upgrader.Upgrade(w, r, nil)
@@ -47,6 +49,93 @@ func output(w http.ResponseWriter, r *http.Request) {
 			default:
 				//log.Println("no message from agents")
 			}
+		}
+	}()
+	go func() {
+		defer c.Close()
+		for {
+			_, msg, err := c.ReadMessage()
+			if err != nil {
+				log.Println("read:", err)
+				break
+			}
+			var data map[string]interface{}
+			err = json.Unmarshal(msg, &data)
+			if err != nil {
+				log.Println(err)
+				continue
+			}
+			imgString := data["img"].(string)
+			posString := data["position"].(map[string]interface{})
+			pos := agentlogic.Vector{
+				X: posString["x"].(float64),
+				Y: posString["y"].(float64),
+				Z: posString["z"].(float64),
+			}
+			//log.Println(posString)
+			// gm := comm.GoalMessage{
+			// 	AgentId:  data["id"].(string),
+			// 	MsgType:  comm.GoalMessageType,
+			// 	Position: pos,
+			// 	Poi:      imgString,
+			// }
+			gm := comm.GoalMessage{
+				MessageMeta: comm.MessageMeta{MsgType: comm.DiscoveryMessageType, SenderId: data["id"].(string), SenderType: comm.VisualizationAgentType},
+				Position:    pos,
+				Poi:         imgString,
+			}
+
+			select {
+			case GoalInfo <- gm:
+
+			default:
+				//log.Println("no message from agents")
+			}
+			// log.Println(imgString)
+			// fi, err := os.Create("tt.txt")
+			// if err != nil {
+			// 	panic(err)
+			// }
+			// defer fi.Close()
+			// n3, err := fi.WriteString(imgString)
+			// if err != nil {
+			// 	panic(err)
+			// }
+			// fmt.Printf("wrote %d bytes\n", n3)
+			// fi.Sync()
+			//panic("S")
+
+			// content, err := ioutil.ReadFile("tt.txt")
+			// if err != nil {
+			// 	log.Fatal(err)
+			// }
+
+			// // Convert []byte to string and print to screen
+			// imgString := string(content)
+
+			// reader := base64.NewDecoder(base64.StdEncoding, strings.NewReader(imgString))
+			// m, formatString, err := image.Decode(reader)
+			// if err != nil {
+			// 	log.Fatal(err)
+			// }
+
+			// bounds := m.Bounds()
+			// fmt.Println(bounds, formatString)
+
+			// //Encode from image format to writer
+			// pngFilename := "test.png"
+			// f, err := os.OpenFile(pngFilename, os.O_WRONLY|os.O_CREATE, 0777)
+			// if err != nil {
+			// 	log.Fatal(err)
+			// 	return
+			// }
+
+			// err = png.Encode(f, m)
+			// if err != nil {
+			// 	log.Fatal(err)
+			// 	return
+			// }
+			// fmt.Println("Png file", pngFilename, "created")
 		}
 	}()
 }

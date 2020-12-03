@@ -6,10 +6,27 @@ const StateMessageType          = 1
 const MissionMessageType        = 2
 const ReorganizationMessageType = 3
 const RecalculatorMessageType   = 4
+var ws;
+var reader = new FileReader();
 
+function sendMessage(blob,position, droneId){
+    
+    if(!ws){
+        console.log("no ws connection");
+        return;
+    }
+    console.log(position);
+    reader.readAsDataURL(blob); 
+    reader.onloadend = function() {
+        var base64data = reader.result.substring(22);                
+        let data = {"img":base64data,"position":position, "id":droneId};
+        ws.send(JSON.stringify(data));  
+    }
+    
+}
 
 window.addEventListener("load", function(evt) {
-    var ws;
+    
     connectWS();
 
     function connectWS(evt) {
@@ -126,3 +143,5 @@ window.addEventListener("load", function(evt) {
     };
     
 });
+
+export {sendMessage}

@@ -4,12 +4,14 @@ import * as THREE from './three/build/three.module.js';
 
 import { OrbitControls } from './three/examples/jsm/controls/OrbitControls.js';
 import Stats from './three/examples/jsm/libs/stats.module.js';
-import { GUI } from './three/examples/jsm/libs/dat.gui.module.js';
+//import { GUI } from './three/examples/jsm/libs/dat.gui.module.js';
 
-import { DragControls } from './three/examples/jsm/controls/DragControls.js';
-import { TransformControls } from './three/examples/jsm/controls/TransformControls.js'
+//import { DragControls } from './three/examples/jsm/controls/DragControls.js';
+//import { TransformControls } from './three/examples/jsm/controls/TransformControls.js'
 
-import * as UnitController from "./controller.js";
+//import * as UnitController from "./controller.js";
+
+import {sendMessage}  from "./controller.js"
 
 String.prototype.format = function () {
 
@@ -52,6 +54,9 @@ var controls; //camera controls
 
 var missionPaths = {}
 
+const ControllerAgent = 0
+const ContextAgent    = 1
+
 
 container.addEventListener('mousemove', onDocumentMouseMove, false);
 container.addEventListener('mousedown', onDocumentMouseDown, false);
@@ -59,8 +64,9 @@ document.addEventListener('keyup', onDocumentKeyUp, false);
 
 
 window.addEventListener('load', function () {
-	init()
-	animate()
+	init();
+	animate();
+	loadGoal();
 })
 
 
@@ -187,9 +193,6 @@ function transLngLat( lng, lat)
 }
 
 function init() {
-	
-
-	
 
 	scene = new THREE.Scene();
 	scene.background = new THREE.Color( 0xf0f0f0 );
@@ -318,8 +321,47 @@ function render() {
 	renderer.render( scene, camera );
 }
 
-const ControllerAgent = 0
-const ContextAgent    = 1
+
+
+function loadGoal(){
+	console.log("HEP")
+	fetch("goal/goal.json")
+  		.then(response => response.json())
+  		.then(json => loadImg(json));
+
+	function loadImg(json){
+		console.log(json)
+		var loader = new THREE.TextureLoader();
+
+		// Load an image file into a custom material
+		var material = new THREE.MeshLambertMaterial({
+			map: loader.load(json['uri'])
+		});
+		console.log(material);
+		// create a plane geometry for the image with a width of 10
+		// and a height that preserves the image's aspect ratio
+		var geometry = new THREE.PlaneGeometry(10, 10*.75);
+
+		// combine our image geometry and material into a mesh
+		var mesh = new THREE.Mesh(geometry, material);
+
+		//NOTE: The position is the position in the visualization coordinate system
+		let position = json['position'];
+		
+		//mesh.position.set(-607,0,742)
+		//mesh.position.set(-700,0,450)
+		mesh.position.set(position.X,position.Y,position.Z);
+		mesh.scale.set(20,20,20);
+		//mesh.rotation.y = Math.PI;
+
+		// add the image to the scene
+		scene.add(mesh);
+	}
+
+
+}
+
+
 
 function updateAgent(data){
 	
@@ -373,11 +415,35 @@ function updateDrone(data){
 		drone.mesh.position.x = data.vizPos.x;
 		drone.mesh.position.y = data.vizPos.y;
 		drone.mesh.position.z = data.vizPos.z;
+		let formerPos = drone.camera.position;
+		let currentPos = drone.mesh.position;
+		let look = formerPos.sub(currentPos);
+		drone.camera.position.x = drone.mesh.position.x;
+		drone.camera.position.y = drone.mesh.position.y;
+		drone.camera.position.z = drone.mesh.position.z;
+		drone.camera.lookAt(look);
+		
 	}else{
 		drone.moving=true;
 		drone.mesh.material.color = drone.color;
 	}
 	drone.mesh.scale.set(1,1,1);
+	//send image
+	renderer.render(scene, drone.camera);
+    renderer.domElement.toBlob(function(blob){
+		//console.log(blob);
+		sendMessage(blob,drone.data.position, data.id);
+		// var fd = new FormData();
+		// fd.append('name', 'file');
+		// fd.append('data', blob);
+		// $.ajax({
+		// 	type: 'POST',
+		// 	url: 'http://localhost:8888/upload',
+		// 	data: fd,
+		// 	processData: false,
+        //     contentType: false
+		// });
+	});
 	
 	let key = "travel-"+drone.data.id;
 	removedTraveled(key);
@@ -453,7 +519,13 @@ function addDrone(droneData,pathColor){
 	mesh.position.x = droneData.vizPos.x;
 	mesh.position.y = droneData.vizPos.y;
 	mesh.position.z = droneData.vizPos.z;
-	var drone = {"data":droneData,"mesh":mesh,"path":[],"pathVisible":false, "color":color.clone(), "pathColor":pathColor,"moving":true};
+	
+	let camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 1, 1000);
+	camera.position.x = mesh.position.x;
+	camera.position.y = mesh.position.y;
+	camera.position.z = mesh.position.z;
+
+	var drone = {"data":droneData,"mesh":mesh,"path":[],"pathVisible":false, "color":color.clone(), "pathColor":pathColor,"moving":true, "camera":camera};
 	drones[droneId] = drone;
 	mesh.name = "OOI";
 	mesh.agentId = droneId
