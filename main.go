@@ -1,15 +1,27 @@
 package main
 
 import (
+	"flag"
 	"log"
+	"strings"
 
-	"alexandra.dk/D2D-WebVisualization/webserver"
 	comm "github.com/alexandrainst/D2D-communication"
 )
 
 func main() {
-	log.Println("Starting webserver")
-	webserver.StartWebServer()
+	whatType := flag.String("type", "WS", "Communication type to visualization {ws|mqtt}")
+	flag.Parse()
+	log.Println(*whatType)
+	if strings.ToUpper(*whatType) == "WS" {
+		log.Println("Starting webserver")
+		StartWebServer()
+	} else if strings.ToUpper(*whatType) == "MQTT" {
+		log.Println("Starting mqtt communication")
+		StartMQTT()
+	} else {
+		panic("No proper communication form selected")
+	}
+
 	log.Println("Starting P2P communication")
 	go startVizwork()
 	select {}
@@ -29,7 +41,7 @@ func startVizwork() {
 			}
 
 			select {
-			case webserver.AgentsInfo <- *msg:
+			case AgentsInfo <- *msg:
 				//log.Println("sent message")
 			default:
 
@@ -38,7 +50,7 @@ func startVizwork() {
 		}
 	}()
 	for {
-		goal := <-webserver.GoalInfo
+		goal := <-GoalInfo
 		comm.SendVizGoal(goal)
 	}
 
